@@ -36,7 +36,7 @@ For this data, it's already the First normal form(1NF) because it has no duplica
 
 ## Acheiving 2NF
 From the Field descriptions, we know that contrib can be identified by contribid and fam. "City", "State" and "Zip" can be identified by home address of donor or employer's address which identified by "Fecoccemp".
-"ultorg" can be identified by the combination of "Fecoccemp" and "orgname". "amount" can be identified by "date" and "contrib". "recipid" be identified by "recipient". "party" and "recipcode" identified by "recipient"."cmteid" identified by "recipient". "fectransid" is unique independent. 
+"ultorg" can be identified by the combination of "Fecoccemp" and "orgname". "amount" can be identified by "date", "cycle" and "contrib". "recipid" be identified by "recipient". "party" and "recipcode" identified by "recipient"."cmteid" identified by "recipient". "fectransid" is unique independent. 
 
 From our analysis of the relationship between variables, we can define prime attribute as "fectransid", "date", "amount", "contrib", "recipent" and "Fecoccemp". And other vaviables are defined as non-prime attribute.
 ```{r}
@@ -68,6 +68,7 @@ library(RSQLite)
 library(DBI)
 #Create an ephemeral in-memory RSQLite database:
 Contrib = dbConnect(SQLite(),"jingning.sqlite")
+#Formulate tables:
 dbWriteTable(Contrib,"Main contribution",new, header=TRUE, overwrite=TRUE)
 dbWriteTable(Contrib,"Contributors",cont, header=TRUE, overwrite=TRUE)
 dbWriteTable(Contrib,"Recipients",rec, header=TRUE, overwrite=TRUE)
