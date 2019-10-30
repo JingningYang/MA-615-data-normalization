@@ -77,5 +77,5 @@ dbWriteTable(Contrib,"Address of Organizations",add, header=TRUE, overwrite=TRUE
 dbWriteTable(Contrib,"Patent of Organizations",patent, header=TRUE, overwrite=TRUE)
 
 ```
-
+For database, please download the attached file: jingning.splite
 
