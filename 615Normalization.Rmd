@@ -28,9 +28,21 @@ From the column name, we can see that the value of "contrib" are Last name, Firs
 ```{r}
 library(tidyr)
 total$lastname <- NULL
-#Clear all middle name after the Last name and first name in "contrib since there are typo questions inside our raw data"
-total$contrib <- gsub(" [a-z]", "", total$contrib, ignore.case = T)
-head(total)
+mini <- function(x){
+  len <- x %>%unique%>% sapply(nchar)
+  name <- unique(x)
+  mod <- head(name[which(len==min(len))],1)
+  return(mod)
+}
+
+#Figuring out hortest name for each person&naming the new column for unify names:
+contrib1 <- total %>% group_by(contribid,fam) %>% summarise(contrib1 = mini(contrib))
+#Delete the old contrib:
+total <- total %>% select(-"contrib")
+#Add the new contrib into our dataset:
+total1 <- left_join(total,contrib1,by = c("contribid","fam"))
+
+head(total1)
 ```
 For this data, it's already the First normal form(1NF) because it has no duplicative columns from the same table and each attribute only contain a single value from its pre-defined domain.
 
