@@ -26,6 +26,7 @@ col
 From the column name, we can see that the value of "contrib" are Last name, First name; and the value of "lastname" is the Last name of contributors which is duplicated with the part of contrib. Thus, we can delete the column "lastname".
 
 ```{r}
+library(tidyverse)
 library(tidyr)
 total$lastname <- NULL
 mini <- function(x){
