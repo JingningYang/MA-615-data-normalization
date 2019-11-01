@@ -1,0 +1,131 @@
+---
+title: "615Norm"
+author: "Jingning Yang"
+date: "10/27/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Database Normalization
+
+### Import excel table to rstudio & 1NF
+
+```{r }
+library(readxl)
+data <- read_excel("Top MA Donors 2016-2020(1).xlsx", sheet = 2)
+data1 <- read_excel("Top MA Donors 2016-2020(1).xlsx", sheet = 3)
+#Combine 2 dataset into one with same variables: ,,,,
+total <- rbind(data, data1)
+head(total)
+col <- colnames(total)
+col
+```
+From the column name, we can see that the value of "contrib" are Last name, First name; and the value of "lastname" is the Last name of contributors which is duplicated with the part of contrib. Thus, we can delete the column "lastname".
+
+```{r}
+library(magrittr)
+library(RecordLinkage)
+library(tidyverse)
+library(tidyr)
+total$lastname <- NULL
+
+#Unify all different name in contrib when they share same 'contribid' and 'fam', since there are typo questions inside our raw data.
+mini <- function(x){
+  len <- x %>%unique%>% sapply(nchar)
+  name <- unique(x)
+  mod <- head(name[which(len==min(len))],1)
+  return(mod)
+}
+#Figuring out hortest name for each person&naming the new column for unify names:
+contrib1 <- total %>% group_by(contribid,fam) %>% summarise(contrib1 = mini(contrib))
+#Delete the old contrib:
+total <- total %>% select(-"contrib")
+#Add the new contrib into our dataset:
+total1 <- left_join(total,contrib1,by = c("contribid","fam"))
+
+#Unify all different company name in 'Feccocamp' when 
+comp <- total%>%select(Fecoccemp, fectransid)
+colnames(comp) <- c("name","id")
+comp %<>% mutate(like = levenshteinDist(comp$name[1], name)) %>% arrange(name)
+
+comp$name <- gsub(comp$name, "\\W", " ")
+repeat{
+  sub = 0
+  for(i in 1:(length(comp$name)-1)){
+    up = nchar(comp$name[i])
+    down = nchar(comp$name[i+1])
+    if(comp$name[i] != comp$name[i+1] & levenshteinDist(comp$name[i], comp$name[i+1]) <= 3){
+      if(up > down){
+        comp$name[i] <- comp$name[i+1]
+        sub <- sub + 1
+      }
+      if(up <= down){
+        comp$name[i+1] <- comp$name[i]
+        sub <- sub + 1
+      }
+    }
+  }
+  s <- sample(seq(1, length(comp$name), 10), size = 1)
+  comp %<>% mutate(like = levenshteinDist(comp$name[s], name)) %>% arrange(name)
+  if(sub == 0){
+    break
+  }
+}
+comp <- comp%>% select(-"like")
+colnames(comp) <- c("Fecoccemp", "fectransid")
+total2 <- total1%>% select(-"Fecoccemp")
+total2 <- left_join(total2, comp, by="fectransid")
+
+
+
+head(total1)
+```
+For this data, it's already the First normal form(1NF) because it has no duplicative columns from the same table and each attribute only contain a single value from its pre-defined domain.
+
+## Acheiving 2NF
+From the Field descriptions, we know that contrib can be identified by contribid and fam. "City", "State" and "Zip" can be identified by home address of donor or employer's address which identified by "Fecoccemp".
+"ultorg" can be identified by the combination of "Fecoccemp" and "orgname". "amount" can be identified by "date" and "contrib". "recipid" be identified by "recipient". "party" and "recipcode" identified by "recipient"."cmteid" identified by "recipient". "fectransid" is unique independent. 
+
+From our analysis of the relationship between variables, we can define prime attribute as "fectransid", "date", "amount", "contrib", "recipent" and "Fecoccemp". And other vaviables are defined as non-prime attribute.
+```{r}
+library(tidyverse)
+new <- unique(select(total1, fectransid, date, cycle, contrib1, amount, type, recipient, Fecoccemp))
+# we considered "new" as the main donoration information table, and for more information, we can go to subordinary tables.
+
+rec <- unique(select(total1, recipient, party, recipcode, recipid, cmteid)) #Table for the details of recipient.
+
+add <- unique(select(total1, Fecoccemp, Zip, City, State)) # Information table for the address of donor's occupation.
+
+cont <- unique(select(total1, contrib1, contribid, fam)) #Table for the information of donors self.
+
+employer <- unique(select(total1, Fecoccemp, orgname, ultorg)) #Table for the organization of donors.
+```
+
+## For 3NF
+In the table "employer", it shows that "ultorg" can be identified by "orgname", thus, we should fix this as add another chart about "ultorg" and "orgname"
+```{r}
+total$orgname1 <- tolower(total$orgname)  #uniform form to lower case in case of sensitivity on alphabetic case.
+patent <- unique(select(total, orgname1, ultorg))
+#Thus, we delete ultorg from employer
+employer1 <- unique(select(total, Fecoccemp, orgname))
+```
+
+## Build the database
+```{r}
+library(RSQLite)
+library(DBI)
+#Create an ephemeral in-memory RSQLite database:
+Contrib = dbConnect(SQLite(),"jingning.sqlite")
+dbWriteTable(Contrib,"Main contribution",new, header=TRUE, overwrite=TRUE)
+dbWriteTable(Contrib,"Contributors",cont, header=TRUE, overwrite=TRUE)
+dbWriteTable(Contrib,"Recipients",rec, header=TRUE, overwrite=TRUE)
+dbWriteTable(Contrib,"Organizations",employer1, header=TRUE, overwrite=TRUE)
+dbWriteTable(Contrib,"Address of Organizations",add, header=TRUE, overwrite=TRUE)
+dbWriteTable(Contrib,"Patent of Organizations",patent, header=TRUE, overwrite=TRUE)
+
+```
+
+
